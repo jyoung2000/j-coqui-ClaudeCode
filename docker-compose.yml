@@ -1,35 +1,31 @@
 version: '3.8'
 
 services:
-  coqui-tts:
+  coqui-tts-web:
     build:
       context: .
-      dockerfile: Dockerfile
-      args:
-        - CUDA_VERSION=11.8.0
-    container_name: coqui-tts-web
+      dockerfile: Dockerfile.web
     ports:
       - "2201:2201"
     volumes:
-      - ./voices:/app/voices
-      - ./output:/app/output
-      - ./models:/app/models
+      - ./data/models:/app/models
+      - ./data/voices:/app/voices
+      - ./data/outputs:/app/outputs
+      - ./data/uploads:/app/uploads
     environment:
-      - FLASK_PORT=2201
-      - CUDA_VISIBLE_DEVICES=0
       - PYTHONUNBUFFERED=1
-      - TTS_MODEL=tts_models/multilingual/multi-dataset/xtts_v2
+      - TTS_MODELS_DIR=/app/models
+      - TTS_VOICES_DIR=/app/voices
+      - TTS_OUTPUTS_DIR=/app/outputs
+      - TTS_UPLOADS_DIR=/app/uploads
+      - FLASK_ENV=production
+      - PORT=2201
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2201/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    container_name: coqui-tts-web
+    command: ["python", "/app/web_server/app.py"]
+
+  # Optional: Redis for caching (if needed for performance)
+  # redis:
+  #   image: redis:alpine
+  #   container_name: coqui-tts-redis
+  #   restart: unless-stopped
