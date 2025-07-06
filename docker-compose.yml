@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  coqui-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - CUDA_VERSION=11.8.0
+    container_name: coqui-tts-web
+    ports:
+      - "2201:2201"
+    volumes:
+      - ./voices:/app/voices
+      - ./output:/app/output
+      - ./models:/app/models
+    environment:
+      - FLASK_PORT=2201
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTHONUNBUFFERED=1
+      - TTS_MODEL=tts_models/multilingual/multi-dataset/xtts_v2
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2201/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
