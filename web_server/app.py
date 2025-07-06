@@ -15,18 +15,40 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import traceback
 
+# Set environment variables before importing numba-dependent libraries
+os.environ['NUMBA_CACHE_DIR'] = '/tmp/numba_cache'
+os.environ['NUMBA_DISABLE_JIT'] = '0'
+
+# Create cache directory
+cache_dir = os.environ.get('NUMBA_CACHE_DIR', '/tmp/numba_cache')
+os.makedirs(cache_dir, exist_ok=True)
+
 import torch
 from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-import librosa
-import soundfile as sf
+
+# Import audio libraries with error handling
+try:
+    import librosa
+    import soundfile as sf
+    AUDIO_LIBS_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: Audio libraries not fully available: {e}")
+    AUDIO_LIBS_AVAILABLE = False
 
 # Add TTS to path
 sys.path.insert(0, '/app')
-from TTS.api import TTS
-from TTS.utils.manage import ModelManager
-from TTS.utils.synthesizer import Synthesizer
+
+# Import TTS with error handling
+try:
+    from TTS.api import TTS
+    from TTS.utils.manage import ModelManager
+    from TTS.utils.synthesizer import Synthesizer
+    TTS_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: TTS not fully available: {e}")
+    TTS_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +82,11 @@ voice_profiles = {}
 def initialize_models():
     """Initialize TTS models and model manager"""
     global model_manager, available_models
+    
+    if not TTS_AVAILABLE:
+        logger.error("TTS libraries not available, running in limited mode")
+        available_models = {'tts_models': {}, 'vocoder_models': {}, 'voice_conversion_models': {}}
+        return
     
     try:
         model_manager = ModelManager()
@@ -106,6 +133,9 @@ def get_current_model():
     """Get or initialize the current TTS model"""
     global current_tts_model
     
+    if not TTS_AVAILABLE:
+        return None
+    
     if current_tts_model is None:
         try:
             # Default to XTTS v2 for voice cloning capabilities
@@ -137,7 +167,9 @@ def health():
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
         'cuda_available': torch.cuda.is_available(),
-        'models_loaded': current_tts_model is not None
+        'models_loaded': current_tts_model is not None,
+        'tts_available': TTS_AVAILABLE,
+        'audio_libs_available': AUDIO_LIBS_AVAILABLE
     })
 
 @app.route('/api/models')
@@ -228,19 +260,24 @@ def clone_voice():
         audio_file.save(audio_path)
         
         # Process audio for voice cloning (ensure proper format)
-        try:
-            # Load and resample to 22050 Hz for better compatibility
-            audio, sr = librosa.load(audio_path, sr=22050)
-            sf.write(audio_path, audio, sr)
-        except Exception as e:
-            logger.warning(f"Audio processing warning: {e}")
+        duration = 0
+        if AUDIO_LIBS_AVAILABLE:
+            try:
+                # Load and resample to 22050 Hz for better compatibility
+                audio, sr = librosa.load(audio_path, sr=22050)
+                sf.write(audio_path, audio, sr)
+                duration = len(audio) / sr
+            except Exception as e:
+                logger.warning(f"Audio processing warning: {e}")
+        else:
+            logger.warning("Audio processing libraries not available, using original file")
         
         # Save voice profile
         voice_profiles[voice_name] = {
             'name': voice_name,
             'audio_path': audio_path,
             'created_at': datetime.now().isoformat(),
-            'duration': len(audio) / sr if 'audio' in locals() else 0
+            'duration': duration
         }
         
         save_voice_profiles()
