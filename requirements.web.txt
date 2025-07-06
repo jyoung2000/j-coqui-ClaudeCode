@@ -1,0 +1,11 @@
+# Web server specific dependencies
+flask>=2.0.1
+flask-cors>=4.0.0
+werkzeug>=2.0.0
+
+# Audio processing for web interface
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Core TTS dependencies (referenced from main requirements.txt)
+-r requirements.txt

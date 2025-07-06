@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐸 Coqui TTS - Advanced Voice Synthesis</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .voice-profile {
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            color: white;
+            border-radius: 15px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .voice-profile:hover {
+            transform: scale(1.02);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-online { background: #28a745; }
+        .status-offline { background: #dc3545; }
+        .status-loading { background: #ffc107; animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .audio-controls {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            background: rgba(102, 126, 234, 0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.1);
+        }
+        
+        .file-item {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .progress-bar {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+        
+        .settings-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        
+        .logo {
+            max-height: 60px;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <img src="https://raw.githubusercontent.com/coqui-ai/TTS/main/images/coqui-log-green-TTS.png" 
+                     alt="Coqui TTS" class="logo me-3">
+                <span class="fw-bold">Advanced TTS Studio</span>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="connectionStatus">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-container">
+            <div class="row">
+                <!-- Text to Speech Panel -->
+                <div class="col-md-8">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0"><i class="fas fa-microphone me-2"></i>Text to Speech</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="textInput" class="form-label">Enter Text to Synthesize</label>
+                                <textarea class="form-control" id="textInput" rows="4" 
+                                         placeholder="Type your message here..."></textarea>
+                            </div>
+                            
+                            <!-- Settings Panel -->
+                            <div class="settings-panel">
+                                <h6><i class="fas fa-cog me-2"></i>Voice Settings</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="voiceSelect" class="form-label">Voice Profile</label>
+                                        <select class="form-select" id="voiceSelect">
+                                            <option value="">Default Voice</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="languageSelect" class="form-label">Language</label>
+                                        <select class="form-select" id="languageSelect">
+                                            <option value="en">English</option>
+                                            <option value="es">Spanish</option>
+                                            <option value="fr">French</option>
+                                            <option value="de">German</option>
+                                            <option value="it">Italian</option>
+                                            <option value="pt">Portuguese</option>
+                                            <option value="pl">Polish</option>
+                                            <option value="tr">Turkish</option>
+                                            <option value="ru">Russian</option>
+                                            <option value="nl">Dutch</option>
+                                            <option value="cs">Czech</option>
+                                            <option value="ar">Arabic</option>
+                                            <option value="zh">Chinese</option>
+                                            <option value="ja">Japanese</option>
+                                            <option value="hu">Hungarian</option>
+                                            <option value="ko">Korean</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-3">
+                                    <div class="col-md-4">
+                                        <label for="speedControl" class="form-label">Speed</label>
+                                        <input type="range" class="form-range" id="speedControl" 
+                                               min="0.5" max="2.0" step="0.1" value="1.0">
+                                        <small class="text-muted">1.0x</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="pitchControl" class="form-label">Pitch</label>
+                                        <input type="range" class="form-range" id="pitchControl" 
+                                               min="-12" max="12" step="1" value="0">
+                                        <small class="text-muted">0 semitones</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="volumeControl" class="form-label">Volume</label>
+                                        <input type="range" class="form-range" id="volumeControl" 
+                                               min="0" max="2.0" step="0.1" value="1.0">
+                                        <small class="text-muted">100%</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2 mt-3">
+                                <button class="btn btn-primary btn-lg" id="synthesizeBtn">
+                                    <i class="fas fa-play me-2"></i>Generate Speech
+                                </button>
+                            </div>
+                            
+                            <!-- Progress Bar -->
+                            <div class="progress mt-3" id="progressContainer" style="display: none;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="progressBar" style="width: 0%"></div>
+                            </div>
+                            
+                            <!-- Audio Player -->
+                            <div class="audio-controls" id="audioContainer" style="display: none;">
+                                <h6><i class="fas fa-headphones me-2"></i>Generated Audio</h6>
+                                <audio controls class="w-100" id="audioPlayer"></audio>
+                                <div class="mt-2">
+                                    <button class="btn btn-success btn-sm" id="downloadBtn">
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </button>
+                                    <button class="btn btn-info btn-sm" id="saveToLibraryBtn">
+                                        <i class="fas fa-save me-1"></i>Save to Library
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Voice Cloning Panel -->
+                <div class="col-md-4">
+                    <div class="card mb-3">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-user-plus me-2"></i>Voice Cloning</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="upload-area" id="uploadArea">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                <h6>Drop audio file here or click to upload</h6>
+                                <small class="text-muted">Supported: WAV, MP3, FLAC (10MB max)</small>
+                                <input type="file" id="audioUpload" accept="audio/*" style="display: none;">
+                            </div>
+                            
+                            <div class="mt-3" id="cloneControls" style="display: none;">
+                                <label for="voiceName" class="form-label">Voice Name</label>
+                                <input type="text" class="form-control" id="voiceName" 
+                                       placeholder="Enter voice name...">
+                                <button class="btn btn-success mt-2 w-100" id="cloneBtn">
+                                    <i class="fas fa-magic me-2"></i>Clone Voice
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Saved Voices -->
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-library me-2"></i>Voice Library</h5>
+                        </div>
+                        <div class="card-body" id="voiceLibrary">
+                            <p class="text-muted text-center">No voices saved yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Generated Files Section -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-folder me-2"></i>Generated Files</h5>
+                            <button class="btn btn-sm btn-outline-dark float-end" id="refreshFiles">
+                                <i class="fas fa-refresh me-1"></i>Refresh
+                            </button>
+                        </div>
+                        <div class="card-body" id="filesList">
+                            <p class="text-muted text-center">No files generated yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model Information -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="fas fa-brain me-2"></i>Model Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Current Model</h6>
+                                    <p id="currentModel" class="text-muted">Loading...</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Device</h6>
+                                    <p id="deviceInfo" class="text-muted">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Global variables
+        let currentAudioUrl = null;
+        let voices = {};
+        
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            loadVoices();
+            loadFiles();
+            checkHealth();
+        });
+        
+        function initializeApp() {
+            console.log('🐸 Coqui TTS Web Interface Initialized');
+            updateStatus('loading', 'Initializing...');
+        }
+        
+        function setupEventListeners() {
+            // Text synthesis
+            document.getElementById('synthesizeBtn').addEventListener('click', synthesizeText);
+            
+            // Voice cloning
+            document.getElementById('uploadArea').addEventListener('click', () => {
+                document.getElementById('audioUpload').click();
+            });
+            
+            document.getElementById('audioUpload').addEventListener('change', handleFileUpload);
+            document.getElementById('cloneBtn').addEventListener('click', cloneVoice);
+            
+            // File management
+            document.getElementById('refreshFiles').addEventListener('click', loadFiles);
+            
+            // Range controls
+            ['speedControl', 'pitchControl', 'volumeControl'].forEach(id => {
+                const control = document.getElementById(id);
+                control.addEventListener('input', updateControlDisplay);
+            });
+            
+            // Drag and drop
+            const uploadArea = document.getElementById('uploadArea');
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.background = 'rgba(118, 75, 162, 0.2)';
+            });
+            
+            uploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                uploadArea.style.background = 'rgba(102, 126, 234, 0.05)';
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.background = 'rgba(102, 126, 234, 0.05)';
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload({target: {files: files}});
+                }
+            });
+        }
+        
+        function updateControlDisplay(event) {
+            const control = event.target;
+            const value = control.value;
+            const display = control.nextElementSibling;
+            
+            switch(control.id) {
+                case 'speedControl':
+                    display.textContent = `${value}x`;
+                    break;
+                case 'pitchControl':
+                    display.textContent = `${value} semitones`;
+                    break;
+                case 'volumeControl':
+                    display.textContent = `${Math.round(value * 100)}%`;
+                    break;
+            }
+        }
+        
+        async function synthesizeText() {
+            const text = document.getElementById('textInput').value.trim();
+            const voiceProfile = document.getElementById('voiceSelect').value;
+            const language = document.getElementById('languageSelect').value;
+            
+            if (!text) {
+                alert('Please enter some text to synthesize');
+                return;
+            }
+            
+            const btn = document.getElementById('synthesizeBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+            
+            showProgress();
+            
+            try {
+                const response = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        voice_profile: voiceProfile,
+                        language: language
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentAudioUrl = result.download_url;
+                    playAudio(currentAudioUrl);
+                    loadFiles(); // Refresh file list
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Synthesis error:', error);
+                alert('Network error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                hideProgress();
+            }
+        }
+        
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('audio/')) {
+                alert('Please select an audio file');
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size must be less than 10MB');
+                return;
+            }
+            
+            document.getElementById('cloneControls').style.display = 'block';
+            document.getElementById('voiceName').value = file.name.replace(/\.[^/.]+$/, "");
+        }
+        
+        async function cloneVoice() {
+            const fileInput = document.getElementById('audioUpload');
+            const voiceName = document.getElementById('voiceName').value.trim();
+            
+            if (!fileInput.files[0]) {
+                alert('Please select an audio file');
+                return;
+            }
+            
+            if (!voiceName) {
+                alert('Please enter a voice name');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('audio', fileInput.files[0]);
+            formData.append('voice_name', voiceName);
+            
+            const btn = document.getElementById('cloneBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cloning...';
+            
+            try {
+                const response = await fetch('/api/clone_voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Voice "${result.voice_name}" cloned successfully!`);
+                    loadVoices();
+                    document.getElementById('cloneControls').style.display = 'none';
+                    fileInput.value = '';
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Cloning error:', error);
+                alert('Network error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+        
+        async function loadVoices() {
+            try {
+                const response = await fetch('/api/voices');
+                voices = await response.json();
+                
+                updateVoiceSelect();
+                updateVoiceLibrary();
+            } catch (error) {
+                console.error('Error loading voices:', error);
+            }
+        }
+        
+        function updateVoiceSelect() {
+            const select = document.getElementById('voiceSelect');
+            const currentValue = select.value;
+            
+            // Clear existing options except default
+            select.innerHTML = '<option value="">Default Voice</option>';
+            
+            // Add voice options
+            Object.keys(voices).forEach(voiceName => {
+                const option = document.createElement('option');
+                option.value = voiceName;
+                option.textContent = voiceName;
+                select.appendChild(option);
+            });
+            
+            // Restore selection
+            if (currentValue && voices[currentValue]) {
+                select.value = currentValue;
+            }
+        }
+        
+        function updateVoiceLibrary() {
+            const library = document.getElementById('voiceLibrary');
+            
+            if (Object.keys(voices).length === 0) {
+                library.innerHTML = '<p class="text-muted text-center">No voices saved yet</p>';
+                return;
+            }
+            
+            library.innerHTML = Object.entries(voices).map(([name, voice]) => `
+                <div class="voice-profile" onclick="selectVoice('${name}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${name}</strong>
+                            <br><small>Created: ${new Date(voice.created_at).toLocaleDateString()}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-light" onclick="deleteVoice('${name}', event)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function selectVoice(voiceName) {
+            document.getElementById('voiceSelect').value = voiceName;
+        }
+        
+        async function deleteVoice(voiceName, event) {
+            event.stopPropagation();
+            
+            if (!confirm(`Delete voice "${voiceName}"?`)) return;
+            
+            try {
+                const response = await fetch(`/api/delete_voice/${voiceName}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadVoices();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error deleting voice:', error);
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/outputs');
+                const result = await response.json();
+                
+                const filesList = document.getElementById('filesList');
+                
+                if (!result.files || result.files.length === 0) {
+                    filesList.innerHTML = '<p class="text-muted text-center">No files generated yet</p>';
+                    return;
+                }
+                
+                filesList.innerHTML = result.files.map(file => `
+                    <div class="file-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${file.filename}</strong>
+                                <br><small class="text-muted">
+                                    ${formatFileSize(file.size)} • ${new Date(file.created).toLocaleString()}
+                                </small>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary me-2" 
+                                        onclick="playAudio('${file.download_url}')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <a href="${file.download_url}" class="btn btn-sm btn-outline-success" download>
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+        
+        function playAudio(url) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            const audioContainer = document.getElementById('audioContainer');
+            
+            audioPlayer.src = url;
+            audioContainer.style.display = 'block';
+            audioPlayer.play();
+            
+            currentAudioUrl = url;
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+            const progressBar = document.getElementById('progressBar');
+            let width = 0;
+            const interval = setInterval(() => {
+                width += Math.random() * 10;
+                if (width >= 90) {
+                    clearInterval(interval);
+                    width = 90;
+                }
+                progressBar.style.width = width + '%';
+            }, 200);
+        }
+        
+        function hideProgress() {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = '100%';
+            setTimeout(() => {
+                document.getElementById('progressContainer').style.display = 'none';
+                progressBar.style.width = '0%';
+            }, 500);
+        }
+        
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const health = await response.json();
+                
+                if (health.status === 'healthy') {
+                    updateStatus('online', 'Connected');
+                    document.getElementById('deviceInfo').textContent = 
+                        health.cuda_available ? 'CUDA (GPU)' : 'CPU';
+                    document.getElementById('currentModel').textContent = 
+                        health.models_loaded ? 'XTTS v2' : 'Loading...';
+                } else {
+                    updateStatus('offline', 'Service unavailable');
+                }
+            } catch (error) {
+                updateStatus('offline', 'Connection failed');
+                console.error('Health check failed:', error);
+            }
+        }
+        
+        function updateStatus(status, message) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('connectionStatus');
+            
+            indicator.className = `status-indicator status-${status}`;
+            statusText.textContent = message;
+        }
+        
+        // Periodic health check
+        setInterval(checkHealth, 30000);
+    </script>
+</body>
+</html>
